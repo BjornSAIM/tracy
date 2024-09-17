@@ -26,6 +26,8 @@
 #include "imgui_internal.h"
 #include "IconsFontAwesome6.h"
 
+#include <string_view>
+
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923
 #endif
@@ -399,8 +401,28 @@ bool View::Draw()
             const auto& srcloc = m_worker.GetSourceLocation( data.srcloc );
             if( srcloc.name.active )
             {
-                TextFocused( "Zone name:", m_worker.GetString( srcloc.name ) );
+                auto& ev = *m_zoneInfoWindow;
+                auto threadData = GetZoneThreadData( ev );
+                const auto end = m_worker.GetZoneEnd( ev );
+                auto msgit = std::lower_bound( threadData->messages.begin(), threadData->messages.end(), ev.Start(), [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+                auto msgend = std::lower_bound( msgit, threadData->messages.end(), end+1, [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+                const auto dist = std::distance( msgit, msgend );
+
+                const char* zoneName = nullptr;
+                if(dist != 0 && !GetZoneChild( ev, (*msgit)->time )) { 
+                    std::string_view zoneNameV { m_worker.GetString((*msgit)->ref) };
+                    if(zoneNameV.starts_with("##")) {
+                        zoneName = zoneNameV.data() + 2;
+                    }
+                } 
+
+                if(!zoneName) {
+                    zoneName =  m_worker.GetString( srcloc.name );
+                }
+
+                TextFocused( "Zone name:", zoneName );
             }
+
             TextFocused( "Function:", m_worker.GetString( srcloc.function ) );
             TextDisabledUnformatted( "Location:" );
             ImGui::SameLine();

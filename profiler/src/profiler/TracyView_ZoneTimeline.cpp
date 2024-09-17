@@ -7,6 +7,7 @@
 #include "TracyTimelineContext.hpp"
 #include "TracyTimelineDraw.hpp"
 #include "TracyView.hpp"
+#include <string_view>
 
 namespace tracy
 {
@@ -285,7 +286,23 @@ void View::DrawZoneList( const TimelineContext& ctx, const std::vector<TimelineD
             const auto end = m_worker.GetZoneEnd( ev );
             const auto zsz = std::max( ( end - ev.Start() ) * pxns, pxns * 0.5 );
             const auto zoneColor = GetZoneColorData( ev, tid, v.depth );
-            const char* zoneName = m_worker.GetZoneName( ev );
+
+            auto threadData = GetZoneThreadData( ev );
+            auto msgit = std::lower_bound( threadData->messages.begin(), threadData->messages.end(), ev.Start(), [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            auto msgend = std::lower_bound( msgit, threadData->messages.end(), end+1, [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            const auto dist = std::distance( msgit, msgend );
+
+            const char* zoneName = nullptr;
+            if(dist != 0 && !GetZoneChild( ev, (*msgit)->time )) { 
+                std::string_view zoneNameV { m_worker.GetString((*msgit)->ref) };
+                if(zoneNameV.starts_with("##")) {
+                    zoneName = zoneNameV.data() + 2;
+                }
+            } 
+
+            if(!zoneName) {
+                zoneName =  m_worker.GetZoneName( ev );
+            }
 
             auto tsz = ImGui::CalcTextSize( zoneName );
             if( m_vd.shortenName == ShortenName::Always || ( ( m_vd.shortenName == ShortenName::NoSpace || m_vd.shortenName == ShortenName::NoSpaceAndNormalize ) && tsz.x > zsz ) )

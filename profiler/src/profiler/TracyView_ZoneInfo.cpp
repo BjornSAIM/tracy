@@ -6,6 +6,8 @@
 #include "TracyMouse.hpp"
 #include "TracyView.hpp"
 
+#include <string_view>
+
 namespace tracy
 {
 
@@ -379,8 +381,24 @@ void View::DrawZoneInfoWindow()
         const auto tid = threadData->id;
         if( m_worker.HasZoneExtra( ev ) && m_worker.GetZoneExtra( ev ).name.Active() )
         {
+            const auto end = m_worker.GetZoneEnd( ev );
+            auto msgit = std::lower_bound( threadData->messages.begin(), threadData->messages.end(), ev.Start(), [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            auto msgend = std::lower_bound( msgit, threadData->messages.end(), end+1, [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            const auto dist = std::distance( msgit, msgend );
             ImGui::PushFont( m_bigFont );
-            TextFocused( "Zone name:", m_worker.GetString( m_worker.GetZoneExtra( ev ).name ) );
+
+            const char* zoneName = nullptr;
+            if(dist != 0 && !GetZoneChild( ev, (*msgit)->time )) { 
+                std::string_view zoneNameV { m_worker.GetString((*msgit)->ref) };
+                if(zoneNameV.starts_with("##")) {
+                    zoneName = zoneNameV.data() + 2;
+                }
+            } 
+
+            if(!zoneName) {
+                zoneName =  m_worker.GetString( m_worker.GetZoneExtra( ev ).name );
+            }
+            TextFocused( "Zone name:", zoneName );    
             ImGui::PopFont();
             if( srcloc.name.active )
             {
@@ -407,8 +425,25 @@ void View::DrawZoneInfoWindow()
         }
         else if( srcloc.name.active )
         {
+            const auto end = m_worker.GetZoneEnd( ev );
+            auto msgit = std::lower_bound( threadData->messages.begin(), threadData->messages.end(), ev.Start(), [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            auto msgend = std::lower_bound( msgit, threadData->messages.end(), end+1, [] ( const auto& lhs, const auto& rhs ) { return lhs->time < rhs; } );
+            const auto dist = std::distance( msgit, msgend );
             ImGui::PushFont( m_bigFont );
-            TextFocused( "Zone name:", m_worker.GetString( srcloc.name ) );
+            
+            const char* zoneName = nullptr;
+            if(dist != 0 && !GetZoneChild( ev, (*msgit)->time )) { 
+                std::string_view zoneNameV { m_worker.GetString((*msgit)->ref) };
+                if(zoneNameV.starts_with("##")) {
+                    zoneName = zoneNameV.data() + 2;
+                }
+            } 
+
+            if(!zoneName) {
+                zoneName =  m_worker.GetString( srcloc.name );
+            }
+            
+            TextFocused( "Zone name:", zoneName );
             ImGui::PopFont();
             ImGui::SameLine();
             if( ClipboardButton( 1 ) ) ImGui::SetClipboardText( m_worker.GetString( srcloc.name ) );
